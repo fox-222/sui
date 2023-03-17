@@ -223,7 +223,7 @@ pub async fn metadata(
                 context
                     .client
                     .governance_api()
-                    .get_delegated_stakes(*sender)
+                    .get_stakes(*sender)
                     .await?
                     .into_iter()
                     .flat_map(|s| {

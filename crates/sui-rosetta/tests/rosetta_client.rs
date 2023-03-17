@@ -14,7 +14,6 @@ use serde_json::Value;
 use tokio::task::JoinHandle;
 
 use sui_config::utils;
-use sui_json_rpc_types::{SuiObjectDataOptions, SuiObjectResponseQuery};
 use sui_keys::keystore::AccountKeystore;
 use sui_keys::keystore::Keystore;
 use sui_rosetta::operations::Operations;

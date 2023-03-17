@@ -93,10 +93,7 @@ async fn get_sub_account_balances(
         }
 
         SubAccountType::EstimatedReward => {
-            let delegations = client
-                .governance_api()
-                .get_delegated_stakes(address)
-                .await?;
+            let delegations = client.governance_api().get_stakes(address).await?;
             delegations.into_iter().fold(vec![], |mut amounts, stakes| {
                 for stake in &stakes.stakes {
                     if let StakeStatus::Active { estimated_reward } = stake.status {
