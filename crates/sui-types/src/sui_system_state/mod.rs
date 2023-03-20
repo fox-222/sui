@@ -216,7 +216,7 @@ pub fn multiaddr_to_anemo_address(multiaddr: &Multiaddr) -> Option<anemo::types:
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, Default)]
 pub struct PoolTokenExchangeRate {
     sui_amount: u64,
     pool_token_amount: u64,
@@ -226,7 +226,7 @@ impl PoolTokenExchangeRate {
     /// Rate of the staking pool, pool token amount : Sui amount
     pub fn rate(&self) -> f64 {
         if self.sui_amount == 0 {
-            0 as f64
+            1 as f64
         } else {
             self.pool_token_amount as f64 / self.sui_amount as f64
         }
