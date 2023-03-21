@@ -216,7 +216,7 @@ pub async fn metadata(
             let amount = amounts.iter().sum::<u64>();
             (Some(amount), vec![], 1000)
         }
-        InternalOperation::Stake { amount, .. } => (*amount, vec![], 1200),
+        InternalOperation::Stake { amount, .. } => (*amount, vec![], 20000),
         InternalOperation::WithdrawStake { sender, stake_ids } => {
             let stake_ids = if stake_ids.is_empty() {
                 // unstake all
@@ -255,7 +255,7 @@ pub async fn metadata(
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(SuiError::from)?;
 
-            (Some(0), stake_refs, 2000)
+            (Some(0), stake_refs, 20000)
         }
     };
 
@@ -309,7 +309,7 @@ pub async fn metadata(
         return Err(Error::TransactionDryRunError(error.to_string()));
     }
 
-    let budget = effects.gas_used().computation_cost + effects.gas_used().storage_cost;
+    let budget = (effects.gas_used().computation_cost + effects.gas_used().storage_cost) * 3;
 
     Ok(ConstructionMetadataResponse {
         metadata: ConstructionMetadata {
