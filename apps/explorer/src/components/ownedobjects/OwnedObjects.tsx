@@ -6,6 +6,8 @@ import {
     Coin,
     getObjectFields,
     getObjectId,
+    getObjectType,
+    getObjectOwner,
     PaginatedObjectsResponse,
     is,
 } from '@mysten/sui.js';
@@ -65,7 +67,25 @@ function OwnedObject({ id, byAddress }: { id: string; byAddress: boolean }) {
                 .then((results) => {
                     setResults(
                         results
-                            .filter(({ status }) => status === 'Exists')
+                            .filter((resp) => {
+                                if (
+                                    byAddress &&
+                                    getObjectType(resp) === 'moveObject'
+                                ) {
+                                    const owner = getObjectOwner(resp);
+                                    const addressOwner =
+                                        owner &&
+                                        owner !== 'Immutable' &&
+                                        'AddressOwner' in owner
+                                            ? owner.AddressOwner
+                                            : null;
+                                    return (
+                                        resp.status === 'Exists' &&
+                                        addressOwner === id
+                                    );
+                                }
+                                return resp.status === 'Exists';
+                            })
                             .map(
                                 (resp) => {
                                     const contents = getObjectFields(resp);
