@@ -439,4 +439,40 @@ module sui::coin {
         object::delete(id);
         balance::destroy_for_testing(balance)
     }
+
+    #[test_only]
+    /// Create metadata, for testing purposes only.
+    public fun create_metadata_for_testing<T>(
+        decimals: u8,
+        symbol: vector<u8>,
+        name: vector<u8>,
+        description: vector<u8>,
+        icon_url: Option<Url>,
+        ctx: &mut TxContext
+    ): CoinMetadata<T> {
+        CoinMetadata {
+            id: object::new(ctx),
+            decimals,
+            name: string::utf8(name),
+            symbol: ascii::string(symbol),
+            description: string::utf8(description),
+            icon_url
+        }
+    }
+
+    #[test_only]
+    /// Destroy metadata, for testing purposes only.
+    public fun destroy_metadata_for_testing<T>(
+        metadata: CoinMetadata<T>
+    ) {
+        let CoinMetadata {
+            id,
+            decimals: _,
+            name: _,
+            symbol: _,
+            description: _,
+            icon_url: _
+        } = metadata;
+        object::delete(id)
+    }
 }
