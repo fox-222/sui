@@ -33,7 +33,7 @@ import { ProgrammableTransactionView } from '~/pages/transaction-result/programm
 import { Banner } from '~/ui/Banner';
 import { DateCard } from '~/ui/DateCard';
 import { DescriptionItem, DescriptionList } from '~/ui/DescriptionList';
-import { CheckpointSequenceLink, ObjectLink } from '~/ui/InternalLink';
+import { CheckpointLink, ObjectLink } from '~/ui/InternalLink';
 import { PageHeader } from '~/ui/PageHeader';
 import { StatAmount } from '~/ui/StatAmount';
 import { TableHeader } from '~/ui/TableHeader';
@@ -315,9 +315,9 @@ export function TransactionView({
                                 <TableHeader>Checkpoint Detail</TableHeader>
                                 <div className="pt-4">
                                     <DescriptionItem title="Checkpoint Seq. Number">
-                                        <CheckpointSequenceLink
+                                        <CheckpointLink
                                             noTruncate
-                                            sequence={String(
+                                            digest={String(
                                                 transaction.checkpoint
                                             )}
                                         />

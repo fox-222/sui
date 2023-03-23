@@ -31,11 +31,6 @@ function createInternalLink<T extends string>(
 }
 
 export const CheckpointLink = createInternalLink('checkpoint', 'digest');
-export const CheckpointSequenceLink = createInternalLink(
-    'checkpoint',
-    'sequence',
-    (address: string) => address
-);
 export const AddressLink = createInternalLink('address', 'address');
 export const ObjectLink = createInternalLink('object', 'objectId');
 export const TransactionLink = createInternalLink(
