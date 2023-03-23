@@ -819,10 +819,9 @@ impl PrimaryReceiverHandler {
             DagError::HeaderRequiresQuorum(header.digest())
         );
 
-        // Synchronize all batches referenced in the header.
+        // Synchronize all batches referenced in the header in the background.
         self.synchronizer
-            .sync_header_batches(header, network, /* max_age */ 0)
-            .await?;
+            .sync_header_batches(header.clone(), network, /* max_age */ 0);
 
         // Check that the time of the header is smaller than the current time. If not but the difference is
         // small, just wait. Otherwise reject with an error.

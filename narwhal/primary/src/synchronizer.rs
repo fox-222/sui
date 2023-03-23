@@ -627,7 +627,7 @@ impl Synchronizer {
         let inner = self.inner.clone();
         let header = certificate.header.clone();
         let sync_network = network.clone();
-        let max_age = self.inner.gc_depth.saturating_sub(1);
+        let max_age = 0;
         self.inner.batch_tasks.lock().spawn(async move {
             Synchronizer::sync_batches_internal(inner, &header, sync_network, max_age, true).await
         });
@@ -820,19 +820,16 @@ impl Synchronizer {
     /// Blocks until either synchronization is complete, or the current consensus rounds advances
     /// past the max allowed age. (`max_age == 0` means the header's round must match current
     /// round.)
-    pub async fn sync_header_batches(
-        &self,
-        header: &Header,
-        network: anemo::Network,
-        max_age: Round,
-    ) -> DagResult<()> {
-        Synchronizer::sync_batches_internal(self.inner.clone(), header, network, max_age, false)
-            .await
+    pub fn sync_header_batches(&self, header: Header, network: anemo::Network, max_age: Round) {
+        let inner_clone = self.inner.clone();
+        self.inner.batch_tasks.lock().spawn(async move {
+            Synchronizer::sync_batches_internal(inner_clone, &header, network, max_age, false).await
+        });
     }
 
     // TODO: Add batching support to synchronizer and use this call from executor.
     // pub async fn sync_certificate_batches(
-    //     &self,
+    //     &self,a
     //     header: &Header,
     //     network: anemo::Network,
     //     max_age: Round,
