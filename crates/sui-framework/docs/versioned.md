@@ -211,7 +211,8 @@ Similar to load_value, but return a mutable reference.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="versioned.md#0x2_versioned_load_value_mut">load_value_mut</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="versioned.md#0x2_versioned_Versioned">Versioned</a>): &<b>mut</b> T {
-    <a href="dynamic_field.md#0x2_dynamic_field_borrow_mut">dynamic_field::borrow_mut</a>(&<b>mut</b> self.id, self.version)
+    <b>let</b> result = <a href="dynamic_field.md#0x2_dynamic_field_borrow_mut">dynamic_field::borrow_mut</a>(&<b>mut</b> self.id, self.version);
+    result
 }
 </code></pre>
 

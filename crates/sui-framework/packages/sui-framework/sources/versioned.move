@@ -51,7 +51,8 @@ module sui::versioned {
 
     /// Similar to load_value, but return a mutable reference.
     public fun load_value_mut<T: store>(self: &mut Versioned): &mut T {
-        dynamic_field::borrow_mut(&mut self.id, self.version)
+        let result = dynamic_field::borrow_mut(&mut self.id, self.version);
+        result
     }
 
     /// Take the inner object out for upgrade. To ensure we always upgrade properly, a capability object is returned
