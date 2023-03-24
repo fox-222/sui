@@ -273,9 +273,6 @@ export const DevInspectResults = object({
 });
 export type DevInspectResults = Infer<typeof DevInspectResults>;
 
-export const GetTxnDigestsResponse = array(TransactionDigest);
-export type GetTxnDigestsResponse = Infer<typeof GetTxnDigestsResponse>;
-
 export type SuiTransactionResponseQuery = {
   filter?: TransactionFilter;
   options?: SuiTransactionResponseOptions;
@@ -290,7 +287,7 @@ export type TransactionFilter =
       };
     }
   | { InputObject: ObjectId }
-  | { MutatedObject: ObjectId }
+  | { ChangedObject: ObjectId }
   | { FromAddress: SuiAddress }
   | { ToAddress: SuiAddress };
 
