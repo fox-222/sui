@@ -18,6 +18,7 @@ pub mod metrics;
 mod p2p;
 mod retry;
 mod traits;
+pub mod client;
 
 pub use crate::{
     retry::RetryConfig,
