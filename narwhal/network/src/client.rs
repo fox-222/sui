@@ -1,12 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc, Mutex,
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    time::Duration,
 };
 
-use anemo::{types::response::StatusCode, PeerId, Request, Response};
+use anemo::{rpc::Status, types::response::StatusCode, PeerId, Request, Response};
+use tokio::time::{sleep, timeout};
 use types::{PrimaryToWorker, WorkerSynchronizeMessage, WorkerToPrimary, WorkerToWorker};
 
 /// Uses a Vec to allow running multiple Narwhal instances in the same process.
@@ -32,6 +36,7 @@ impl LocalPrimaryClient {
     /// Sets the instance of LocalPrimarylient.
     pub fn set_global(primary_peer_id: PeerId, client: Arc<Self>) {
         let mut clients = LOCAL_PRIMARY_CLIENTS.lock().unwrap();
+        // Replace the existing client with the same key, or appends to the end of the list.
         if clients.iter_mut().any(|(name, c)| {
             if name == &primary_peer_id {
                 *c = client.clone();
@@ -71,6 +76,24 @@ impl LocalPrimaryClient {
     fn shutdown(&self) {
         self.shutdown.store(true, Ordering::Release);
     }
+
+    pub async fn wait_for(primary_peer_id: &PeerId) -> Result<Arc<Self>, Status> {
+        timeout(Duration::from_secs(10), async {
+            loop {
+                if let Some(client) = Self::get_global(primary_peer_id) {
+                    return client;
+                }
+                sleep(Duration::from_millis(100)).await;
+            }
+        })
+        .await
+        .map_err(|_| {
+            Status::new_with_message(
+                StatusCode::InternalServerError,
+                format!("Primary {primary_peer_id} has not started!"),
+            )
+        })
+    }
 }
 
 pub struct LocalWorkerClient {
@@ -94,6 +117,7 @@ impl LocalWorkerClient {
     /// Sets the instance of LocalWorkerClient.
     pub fn set_global(worker_peer_id: PeerId, client: Arc<Self>) {
         let mut clients = LOCAL_WORKER_CLIENTS.lock().unwrap();
+        // Replace the existing client with the same key, or appends to the end of the list.
         if clients.iter_mut().any(|(name, c)| {
             if name == &worker_peer_id {
                 *c = client.clone();
@@ -134,15 +158,34 @@ impl LocalWorkerClient {
         self.shutdown.store(true, Ordering::Release);
     }
 
-    // pub async fn wait_for(worker_peer_id: &PeerId) -> Arc<Self> {
-    //     timeout(Duration::from_secs(2))
-    // }
+    pub async fn wait_for(worker_peer_id: &PeerId) -> Result<Arc<Self>, Status> {
+        timeout(Duration::from_secs(10), async {
+            loop {
+                if let Some(client) = Self::get_global(worker_peer_id) {
+                    return client;
+                }
+                sleep(Duration::from_millis(100)).await;
+            }
+        })
+        .await
+        .map_err(|_| {
+            Status::new_with_message(
+                StatusCode::NotFound,
+                format!("Worker {worker_peer_id} has not started!"),
+            )
+        })
+    }
 
-    // pub async fn synchronize(
-    //     &self,
-    //     request: Request<WorkerSynchronizeMessage>,
-    // ) -> Result<Response<()>, anemo::rpc::Status> {
-    //     anemo::rpc::Status::new(StatusCode::RequestTimeout)
-    //     self.primary_to_worker.synchronize(request).await
-    // }
+    pub async fn synchronize(
+        &self,
+        request: Request<WorkerSynchronizeMessage>,
+    ) -> Result<Response<()>, anemo::rpc::Status> {
+        if self.shutdown.load(Ordering::Acquire) {
+            return Err(Status::new_with_message(
+                StatusCode::NotFound,
+                "Worker has shutdown!",
+            ));
+        }
+        self.primary_to_worker.synchronize(request).await
+    }
 }
