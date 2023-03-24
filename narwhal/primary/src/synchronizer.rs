@@ -12,6 +12,7 @@ use mysten_common::sync::notify_once::NotifyOnce;
 use mysten_metrics::spawn_monitored_task;
 use network::{
     anemo_ext::{NetworkExt, WaitingPeer},
+    client::LocalWorkerClient,
     RetryConfig,
 };
 use parking_lot::Mutex;
@@ -36,8 +37,8 @@ use types::{
     ensure,
     error::{AcceptNotification, DagError, DagResult},
     metered_channel::Sender,
-    Certificate, CertificateDigest, Header, PrimaryToPrimaryClient, PrimaryToWorkerClient, Round,
-    SendCertificateRequest, SendCertificateResponse, WorkerSynchronizeMessage,
+    Certificate, CertificateDigest, Header, PrimaryToPrimaryClient, Round, SendCertificateRequest,
+    SendCertificateResponse, WorkerSynchronizeMessage,
 };
 
 use crate::{aggregators::CertificatesAggregator, metrics::PrimaryMetrics, CHANNEL_CAPACITY};
@@ -558,7 +559,7 @@ impl Synchronizer {
     async fn process_certificate_internal(
         &self,
         certificate: Certificate,
-        network: &Network,
+        _network: &Network,
         sanitize: bool,
         early_suspend: bool,
     ) -> DagResult<()> {
@@ -626,10 +627,9 @@ impl Synchronizer {
         // We can thus continue the processing of the certificate without blocking on batch synchronization.
         let inner = self.inner.clone();
         let header = certificate.header.clone();
-        let sync_network = network.clone();
         let max_age = self.inner.gc_depth.saturating_sub(1);
         self.inner.batch_tasks.lock().spawn(async move {
-            Synchronizer::sync_batches_internal(inner, &header, sync_network, max_age, true).await
+            Synchronizer::sync_batches_internal(inner, &header, max_age, true).await
         });
 
         let highest_processed_round = self.inner.highest_processed_round.load(Ordering::Acquire);
@@ -820,14 +820,8 @@ impl Synchronizer {
     /// Blocks until either synchronization is complete, or the current consensus rounds advances
     /// past the max allowed age. (`max_age == 0` means the header's round must match current
     /// round.)
-    pub async fn sync_header_batches(
-        &self,
-        header: &Header,
-        network: anemo::Network,
-        max_age: Round,
-    ) -> DagResult<()> {
-        Synchronizer::sync_batches_internal(self.inner.clone(), header, network, max_age, false)
-            .await
+    pub async fn sync_header_batches(&self, header: &Header, max_age: Round) -> DagResult<()> {
+        Synchronizer::sync_batches_internal(self.inner.clone(), header, max_age, false).await
     }
 
     // TODO: Add batching support to synchronizer and use this call from executor.
@@ -844,7 +838,6 @@ impl Synchronizer {
     async fn sync_batches_internal(
         inner: Arc<Inner>,
         header: &Header,
-        network: anemo::Network,
         max_age: Round,
         is_certified: bool,
     ) -> DagResult<()> {
@@ -903,35 +896,27 @@ impl Synchronizer {
                 )
                 .expect("Author of valid header is not in the worker cache")
                 .name;
-            let network = network.clone();
             let retry_config = RetryConfig {
                 retrying_max_elapsed_time: None, // Retry forever.
                 ..Default::default()
             };
             let handle = retry_config.retry(move || {
-                let network = network.clone();
                 let digests = digests.clone();
                 let message = WorkerSynchronizeMessage {
                     digests: digests.clone(),
                     target: header.author,
                     is_certified,
                 };
-                let peer = network.waiting_peer(anemo::PeerId(worker_name.0.to_bytes()));
-                let mut client = PrimaryToWorkerClient::new(peer);
+                let request = Request::new(message);
+                let own_worker = anemo::PeerId(worker_name.0.to_bytes());
                 let inner = inner.clone();
                 async move {
-                    let result = client.synchronize(message).await.map_err(|e| {
-                        backoff::Error::transient(DagError::NetworkError(format!("{e:?}")))
-                    });
-                    if result.is_ok() {
-                        for digest in &digests {
-                            inner
-                                .payload_store
-                                .write(digest, &worker_id)
-                                .map_err(|e| backoff::Error::permanent(DagError::StoreError(e)))?
-                        }
+                    let client = LocalWorkerClient::wait_for(&own_worker).await?;
+                    let result = client.synchronize(request).await?;
+                    for digest in &digests {
+                        inner.payload_store.write(digest, &worker_id).unwrap();
                     }
-                    result
+                    Ok(result)
                 }
             });
             synchronize_handles.push(handle);
