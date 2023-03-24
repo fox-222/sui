@@ -5665,6 +5665,7 @@ dependencies = [
  "narwhal-consensus",
  "narwhal-crypto",
  "narwhal-executor",
+ "narwhal-network",
  "narwhal-primary",
  "narwhal-storage",
  "narwhal-test-utils",

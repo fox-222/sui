@@ -7,6 +7,7 @@ use arc_swap::{ArcSwap, ArcSwapOption};
 use config::{Committee, Parameters, WorkerCache, WorkerId};
 use crypto::{NetworkKeyPair, PublicKey};
 use mysten_metrics::{RegistryID, RegistryService};
+use network::client::LocalWorkerClient;
 use prometheus::Registry;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -122,6 +123,8 @@ impl WorkerNodeInner {
                 .expect("Couldn't send the shutdown signal to downstream components");
             self.tx_shutdown = None;
         }
+
+        LocalWorkerClient::clear_global();
 
         // Now wait until handles have been completed
         try_join_all(&mut self.handles).await.unwrap();

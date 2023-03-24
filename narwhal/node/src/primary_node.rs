@@ -12,6 +12,7 @@ use crypto::{KeyPair, NetworkKeyPair, PublicKey};
 use executor::{get_restored_consensus_output, ExecutionState, Executor, SubscriberResult};
 use fastcrypto::traits::{KeyPair as _, VerifyingKey};
 use mysten_metrics::{RegistryID, RegistryService};
+use network::client::LocalPrimaryClient;
 use primary::{NetworkModel, Primary, PrimaryChannelMetrics, NUM_SHUTDOWN_RECEIVERS};
 use prometheus::{IntGauge, Registry};
 use std::sync::Arc;
@@ -429,6 +430,7 @@ impl PrimaryNode {
     }
 
     pub async fn shutdown(&self) {
+        LocalPrimaryClient::clear_global();
         let mut guard = self.internal.write().await;
         guard.shutdown().await
     }
