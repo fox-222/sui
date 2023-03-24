@@ -41,7 +41,10 @@ use fastcrypto::{
 use futures::{stream::FuturesUnordered, StreamExt};
 use mysten_metrics::spawn_monitored_task;
 use mysten_network::{multiaddr::Protocol, Multiaddr};
-use network::epoch_filter::{AllowedEpoch, EPOCH_HEADER_KEY};
+use network::{
+    client::LocalPrimaryClient,
+    epoch_filter::{AllowedEpoch, EPOCH_HEADER_KEY},
+};
 use network::{failpoints::FailpointsMakeCallbackHandler, metrics::MetricsMakeCallbackHandler};
 use prometheus::Registry;
 use std::collections::HashMap;
@@ -125,10 +128,11 @@ impl Primary {
         parameters.tracing();
 
         // Some info statements
+        let own_peer_id = PeerId(network_signer.public().0.to_bytes());
         info!(
             "Boot primary node with peer id {} and public key {}",
-            PeerId(network_signer.public().0.to_bytes()),
-            authority.protocol_key().encode_base64()
+            own_peer_id,
+            authority.protocol_key().encode_base64(),
         );
 
         // Initialize the metrics
@@ -266,11 +270,24 @@ impl Primary {
             );
         }
 
-        let worker_service = WorkerToPrimaryServer::new(WorkerReceiverHandler {
+        let worker_receiver_handler = WorkerReceiverHandler {
             tx_our_digests,
             payload_store: payload_store.clone(),
             our_workers,
-        });
+        };
+
+        assert!(
+            LocalPrimaryClient::add_global(
+                own_peer_id,
+                Arc::new(LocalPrimaryClient {
+                    worker_to_primary: Arc::new(worker_receiver_handler.clone()),
+                })
+            ),
+            "Duplicated primary peer ID {:?}",
+            own_peer_id
+        );
+
+        let worker_service = WorkerToPrimaryServer::new(worker_receiver_handler);
 
         let addr = address.to_anemo_address().unwrap();
 
