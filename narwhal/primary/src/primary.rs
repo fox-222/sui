@@ -276,15 +276,11 @@ impl Primary {
             our_workers,
         };
 
-        assert!(
-            LocalPrimaryClient::add_global(
-                own_peer_id,
-                Arc::new(LocalPrimaryClient {
-                    worker_to_primary: Arc::new(worker_receiver_handler.clone()),
-                })
-            ),
-            "Duplicated primary peer ID {:?}",
-            own_peer_id
+        LocalPrimaryClient::set_global(
+            own_peer_id,
+            Arc::new(LocalPrimaryClient::new(Arc::new(
+                worker_receiver_handler.clone(),
+            ))),
         );
 
         let worker_service = WorkerToPrimaryServer::new(worker_receiver_handler);

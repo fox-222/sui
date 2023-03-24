@@ -115,30 +115,26 @@ impl Worker {
 
         let mut shutdown_receivers = tx_shutdown.subscribe_n(NUM_SHUTDOWN_RECEIVERS);
 
-        assert!(
-            LocalWorkerClient::add_global(
-                own_peer_id,
-                Arc::new(LocalWorkerClient {
-                    primary_to_worker: Arc::new(PrimaryReceiverHandler {
-                        authority_id: worker.authority.id(),
-                        id: worker.id,
-                        committee: worker.committee.clone(),
-                        worker_cache: worker.worker_cache.clone(),
-                        store: worker.store.clone(),
-                        request_batch_timeout: worker.parameters.sync_retry_delay,
-                        request_batch_retry_nodes: worker.parameters.sync_retry_nodes,
-                        validator: validator.clone(),
-                    }),
-                    worker_to_worker: Arc::new(WorkerReceiverHandler {
-                        id: worker.id,
-                        tx_others_batch: tx_others_batch.clone(),
-                        store: worker.store.clone(),
-                        validator: validator.clone(),
-                    }),
-                })
-            ),
-            "Duplicated worker peer ID {:?}",
-            own_peer_id
+        LocalWorkerClient::set_global(
+            own_peer_id,
+            Arc::new(LocalWorkerClient::new(
+                Arc::new(PrimaryReceiverHandler {
+                    authority_id: worker.authority.id(),
+                    id: worker.id,
+                    committee: worker.committee.clone(),
+                    worker_cache: worker.worker_cache.clone(),
+                    store: worker.store.clone(),
+                    request_batch_timeout: worker.parameters.sync_retry_delay,
+                    request_batch_retry_nodes: worker.parameters.sync_retry_nodes,
+                    validator: validator.clone(),
+                }),
+                Arc::new(WorkerReceiverHandler {
+                    id: worker.id,
+                    tx_others_batch: tx_others_batch.clone(),
+                    store: worker.store.clone(),
+                    validator: validator.clone(),
+                }),
+            )),
         );
 
         let mut worker_service = WorkerToWorkerServer::new(WorkerReceiverHandler {

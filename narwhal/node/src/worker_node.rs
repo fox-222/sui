@@ -3,9 +3,11 @@
 
 use crate::metrics::new_registry;
 use crate::{try_join_all, FuturesUnordered, NodeError};
+use anemo::PeerId;
 use arc_swap::{ArcSwap, ArcSwapOption};
 use config::{Committee, Parameters, WorkerCache, WorkerId};
 use crypto::{NetworkKeyPair, PublicKey};
+use fastcrypto::traits::KeyPair;
 use mysten_metrics::{RegistryID, RegistryService};
 use network::client::LocalWorkerClient;
 use prometheus::Registry;
@@ -33,6 +35,8 @@ pub struct WorkerNodeInner {
     handles: FuturesUnordered<JoinHandle<()>>,
     // The shutdown signal channel
     tx_shutdown: Option<PreSubscribedBroadcastSender>,
+    // Peer ID used for local connections.
+    own_peer_id: Option<PeerId>,
 }
 
 impl WorkerNodeInner {
@@ -60,6 +64,8 @@ impl WorkerNodeInner {
         if self.is_running().await {
             return Err(NodeError::NodeAlreadyRunning);
         }
+
+        self.own_peer_id = Some(PeerId(network_keypair.public().0.to_bytes()));
 
         let (metrics, registry) = if let Some(metrics) = metrics {
             (metrics, None)
@@ -116,6 +122,10 @@ impl WorkerNodeInner {
             return;
         }
 
+        if let Some(peer_id) = self.own_peer_id {
+            LocalWorkerClient::shutdown_global(&peer_id);
+        }
+
         let now = Instant::now();
         if let Some(tx_shutdown) = self.tx_shutdown.as_ref() {
             tx_shutdown
@@ -123,8 +133,6 @@ impl WorkerNodeInner {
                 .expect("Couldn't send the shutdown signal to downstream components");
             self.tx_shutdown = None;
         }
-
-        LocalWorkerClient::clear_global();
 
         // Now wait until handles have been completed
         try_join_all(&mut self.handles).await.unwrap();
@@ -184,6 +192,7 @@ impl WorkerNode {
             registry: None,
             handles: FuturesUnordered::new(),
             tx_shutdown: None,
+            own_peer_id: None,
         };
 
         Self {

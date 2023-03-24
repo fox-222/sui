@@ -1,10 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
 
-use anemo::PeerId;
-use types::{PrimaryToWorker, WorkerToPrimary, WorkerToWorker};
+use anemo::{types::response::StatusCode, PeerId, Request, Response};
+use types::{PrimaryToWorker, WorkerSynchronizeMessage, WorkerToPrimary, WorkerToWorker};
 
 /// Uses a Vec to allow running multiple Narwhal instances in the same process.
 static LOCAL_PRIMARY_CLIENTS: Mutex<Vec<(PeerId, Arc<LocalPrimaryClient>)>> =
@@ -14,18 +17,31 @@ static LOCAL_PRIMARY_CLIENTS: Mutex<Vec<(PeerId, Arc<LocalPrimaryClient>)>> =
 static LOCAL_WORKER_CLIENTS: Mutex<Vec<(PeerId, Arc<LocalWorkerClient>)>> = Mutex::new(Vec::new());
 
 pub struct LocalPrimaryClient {
-    pub worker_to_primary: Arc<dyn WorkerToPrimary>,
+    worker_to_primary: Arc<dyn WorkerToPrimary>,
+    shutdown: AtomicBool,
 }
 
 impl LocalPrimaryClient {
+    pub fn new(worker_to_primary: Arc<dyn WorkerToPrimary>) -> Self {
+        Self {
+            worker_to_primary,
+            shutdown: AtomicBool::new(false),
+        }
+    }
+
     /// Sets the instance of LocalPrimarylient.
-    pub fn add_global(primary_peer_id: PeerId, client: Arc<Self>) -> bool {
+    pub fn set_global(primary_peer_id: PeerId, client: Arc<Self>) {
         let mut clients = LOCAL_PRIMARY_CLIENTS.lock().unwrap();
-        if clients.iter().any(|(name, _)| name == &primary_peer_id) {
-            return false;
+        if clients.iter_mut().any(|(name, c)| {
+            if name == &primary_peer_id {
+                *c = client.clone();
+                return true;
+            }
+            false
+        }) {
+            return;
         }
         clients.push((primary_peer_id, client));
-        true
     }
 
     /// Gets the instance of LocalPrimarylient.
@@ -39,27 +55,55 @@ impl LocalPrimaryClient {
         None
     }
 
-    /// Clears all LocalPrimarylient.
-    pub fn clear_global() {
+    /// Marks the specified LocalPrimarylient as shutdown.
+    pub fn shutdown_global(primary_peer_id: &PeerId) {
         let mut clients = LOCAL_PRIMARY_CLIENTS.lock().unwrap();
-        clients.clear();
+        assert!(clients
+            .iter_mut()
+            .any(|(key, client)| if key == primary_peer_id {
+                client.shutdown();
+                true
+            } else {
+                false
+            }));
+    }
+
+    fn shutdown(&self) {
+        self.shutdown.store(true, Ordering::Release);
     }
 }
 
 pub struct LocalWorkerClient {
-    pub primary_to_worker: Arc<dyn PrimaryToWorker>,
-    pub worker_to_worker: Arc<dyn WorkerToWorker>,
+    primary_to_worker: Arc<dyn PrimaryToWorker>,
+    worker_to_worker: Arc<dyn WorkerToWorker>,
+    shutdown: AtomicBool,
 }
 
 impl LocalWorkerClient {
+    pub fn new(
+        primary_to_worker: Arc<dyn PrimaryToWorker>,
+        worker_to_worker: Arc<dyn WorkerToWorker>,
+    ) -> Self {
+        Self {
+            primary_to_worker,
+            worker_to_worker,
+            shutdown: AtomicBool::new(false),
+        }
+    }
+
     /// Sets the instance of LocalWorkerClient.
-    pub fn add_global(worker_peer_id: PeerId, client: Arc<Self>) -> bool {
+    pub fn set_global(worker_peer_id: PeerId, client: Arc<Self>) {
         let mut clients = LOCAL_WORKER_CLIENTS.lock().unwrap();
-        if clients.iter().any(|(name, _)| name == &worker_peer_id) {
-            return false;
+        if clients.iter_mut().any(|(name, c)| {
+            if name == &worker_peer_id {
+                *c = client.clone();
+                return true;
+            }
+            false
+        }) {
+            return;
         }
         clients.push((worker_peer_id, client));
-        true
     }
 
     /// Gets the instance of LocalWorkerClient.
@@ -73,9 +117,32 @@ impl LocalWorkerClient {
         None
     }
 
-    /// Clears all LocalWorkerClient.
-    pub fn clear_global() {
+    /// Marks the specified LocalPrimarylient as shutdown.
+    pub fn shutdown_global(primary_peer_id: &PeerId) {
         let mut clients = LOCAL_WORKER_CLIENTS.lock().unwrap();
-        clients.clear();
+        assert!(clients
+            .iter_mut()
+            .any(|(key, client)| if key == primary_peer_id {
+                client.shutdown();
+                true
+            } else {
+                false
+            }));
     }
+
+    fn shutdown(&self) {
+        self.shutdown.store(true, Ordering::Release);
+    }
+
+    // pub async fn wait_for(worker_peer_id: &PeerId) -> Arc<Self> {
+    //     timeout(Duration::from_secs(2))
+    // }
+
+    // pub async fn synchronize(
+    //     &self,
+    //     request: Request<WorkerSynchronizeMessage>,
+    // ) -> Result<Response<()>, anemo::rpc::Status> {
+    //     anemo::rpc::Status::new(StatusCode::RequestTimeout)
+    //     self.primary_to_worker.synchronize(request).await
+    // }
 }

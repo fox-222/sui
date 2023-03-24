@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::metrics::new_registry;
 use crate::{try_join_all, FuturesUnordered, NodeError};
+use anemo::PeerId;
 use config::{AuthorityIdentifier, Committee, Parameters, WorkerCache};
 use consensus::bullshark::Bullshark;
 use consensus::consensus::ConsensusRound;
@@ -42,6 +43,8 @@ struct PrimaryNodeInner {
     handles: FuturesUnordered<JoinHandle<()>>,
     // The shutdown signal channel
     tx_shutdown: Option<PreSubscribedBroadcastSender>,
+    // Peer ID used for local connections.
+    own_peer_id: Option<PeerId>,
 }
 
 impl PrimaryNodeInner {
@@ -75,6 +78,8 @@ impl PrimaryNodeInner {
         if self.is_running().await {
             return Err(NodeError::NodeAlreadyRunning);
         }
+
+        self.own_peer_id = Some(PeerId(network_keypair.public().0.to_bytes()));
 
         // create a new registry
         let registry = new_registry();
@@ -115,6 +120,10 @@ impl PrimaryNodeInner {
     async fn shutdown(&mut self) {
         if !self.is_running().await {
             return;
+        }
+
+        if let Some(peer_id) = self.own_peer_id {
+            LocalPrimaryClient::shutdown_global(&peer_id);
         }
 
         // send the shutdown signal to the node
@@ -392,6 +401,7 @@ impl PrimaryNode {
             registry: None,
             handles: FuturesUnordered::new(),
             tx_shutdown: None,
+            own_peer_id: None,
         };
 
         Self {
@@ -430,7 +440,6 @@ impl PrimaryNode {
     }
 
     pub async fn shutdown(&self) {
-        LocalPrimaryClient::clear_global();
         let mut guard = self.internal.write().await;
         guard.shutdown().await
     }
