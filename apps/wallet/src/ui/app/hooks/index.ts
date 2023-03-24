@@ -23,7 +23,6 @@ export { useGetAllBalances } from './useGetAllBalances';
 export { useObjectsOwnedByAddress } from './useObjectsOwnedByAddress';
 export { useOwnedNFT } from './useOwnedNFT';
 export { useGetCoins } from './useGetCoins';
-export { useGetInactiveStakingPoolIds } from './useGetInactiveStakingPoolIds';
 export * from './useSigner';
 export * from './useOriginbyteNft';
 export * from './useTransactionData';
