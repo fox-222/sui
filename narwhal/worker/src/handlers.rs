@@ -82,7 +82,7 @@ impl<V: TransactionValidator> WorkerToWorker for WorkerReceiverHandler<V> {
         &self,
         request: anemo::Request<RequestBatchesRequest>,
     ) -> Result<anemo::Response<RequestBatchesResponse>, anemo::rpc::Status> {
-        const MAX_REQUEST_BATCHES_RESPONSE_SIZE: usize = 6_000_000;
+        const MAX_REQUEST_BATCHES_RESPONSE_SIZE: usize = 4_000_000;
         const BATCH_DIGESTS_READ_CHUNK_SIZE: usize = 200;
 
         let digests_to_fetch = request.into_body().batch_digests;
