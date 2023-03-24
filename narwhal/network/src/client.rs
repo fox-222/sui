@@ -4,7 +4,6 @@
 use std::sync::{Arc, Mutex};
 
 use crypto::NetworkPublicKey;
-use crypto::NetworkPublicKey;
 use types::{PrimaryToWorker, WorkerToPrimary, WorkerToWorker};
 
 /// Uses a Vec to allow running multiple Narwhal instances in the same process.
@@ -40,6 +39,12 @@ impl LocalPrimaryClient {
         }
         None
     }
+
+    /// Clears all LocalPrimarylient.
+    pub fn clear_global() {
+        let mut clients = LOCAL_PRIMARY_CLIENTS.lock().unwrap();
+        clients.clear();
+    }
 }
 
 pub struct LocalWorkerClient {
@@ -67,5 +72,11 @@ impl LocalWorkerClient {
             }
         }
         None
+    }
+
+    /// Clears all LocalWorkerClient.
+    pub fn clear_global() {
+        let mut clients = LOCAL_WORKER_CLIENTS.lock().unwrap();
+        clients.clear();
     }
 }
